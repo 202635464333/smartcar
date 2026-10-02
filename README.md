@@ -2,8 +2,8 @@
 
 华工智能车队一轮考核仓库。
 
-## 环境搭建
 
+## 环境搭建
 - Windows 11 + WSL2 + Ubuntu 22.04 LTS + ROS2 Humble（桌面版）
 - 原本想直接装双系统，性能更好，结果安装过程实在过于繁琐，且后续使用过程比较苛刻，便先使用 WSL 学习，后续需要真实硬件时再考虑双系统
 
@@ -24,3 +24,9 @@
 
 - [ ] M0-1 环境搭建（进行中）
 
+## M0-1 环境验收
+
+使用题目提供的 check_env.sh 自查，结果 PASS=25 / FAIL=0 / WARN=2。
+- 补装：python3-pip、uv 0.12.22、VS Code 1.140 + Python/C-C++/Remote-SSH/Remote-WSL 插件、SSH ed25519 密钥
+- 踩坑：VS Code 插件命令行安装不走代理频繁超时，改用图形界面安装解决；remote-wsl 插件离线 vsix 手动安装到 WSL 侧
+- 剩余 WARN：known_hosts 为空（待与队友互登或连开发板后消除）、虚拟环境未激活（M0-4 做题时用 uv venv 激活）
