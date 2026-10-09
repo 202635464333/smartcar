@@ -2,6 +2,7 @@ import yaml          #读取配置文件
 import csv           #读取表格数据
 import math          #数学计算
 import sys           #处理系统级错误
+import argparse      #解析命令行参数
 
 def load_config(config_yaml): 
     with open(config_yaml) as f:    #打开了某个文件
@@ -51,8 +52,13 @@ def correlation(xs,ys,n,mean_x,mean_y):
     return r
 
 def main():
+    # 读取命令行参数：--config 后面跟的就是配置文件路径
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True, help="配置文件路径")
+    args = parser.parse_args()
+
     try:
-        csv_path, col_x, col_y = load_config("config.yaml")
+        csv_path, col_x, col_y = load_config(args.config)
         xs, ys, n = load_csv(csv_path, col_x, col_y)
         mean_x, mean_y = mean(xs, ys, n)
         r = correlation(xs, ys, n, mean_x, mean_y)
