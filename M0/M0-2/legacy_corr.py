@@ -5,7 +5,7 @@ import math          #数学计算
 CONFIG_PATH = "config.yaml"     #定义变量
 
 with open(CONFIG_PATH) as f:    #打开了某个文件
-    cfg = yaml.safe_load(f)#定义了该变量(字典)是在yaml库里的safe_load的方法
+    cfg = yaml.safe_load(f)     #safe_load把文件对象f里的YAML文本解析成Python对象
 #并将f中的数据字典化给变量
 csv_path = cfg["input_csv"]   #大字典里的一个数据
 col_x = cfg["columns"]["x"]   #大字典套一个小字典
@@ -41,7 +41,7 @@ for i in range(n):   #n依旧是f（分解成几行字典）中数据总和
     dy = dy + b * b
     prod = prod + a * b #某种算法，所得结果不知道有什么用
 
-denom = dx * dy #两组数据（加权平均数的分子）相乘
+denom = math.sqrt(dx * dy) #两组数据（加权平均数的分子）相乘
 r = prod / denom
 
 print("n =", n) #x中的数据总数
