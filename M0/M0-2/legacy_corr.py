@@ -3,11 +3,15 @@ import csv           #读取表格数据
 import math          #数学计算
 import sys           #处理系统级错误
 import argparse      #解析命令行参数
+import os            #拼接文件路径
 
 def load_config(config_yaml): 
     with open(config_yaml) as f:    #打开了某个文件
         cfg = yaml.safe_load(f)     #safe_load把文件对象f里的YAML文本解析成Python对象
         csv_path = cfg["input_csv"]   #大字典里的一个数据
+        # 如果按当前所在目录找不到数据文件，就到配置文件所在的目录里再找一次
+        if not os.path.exists(csv_path):
+            csv_path = os.path.join(os.path.dirname(config_yaml), csv_path)
         col_x = cfg["columns"]["x"]   #大字典套一个小字典
         col_y = cfg["columns"]["y"]
     return csv_path, col_x, col_y
