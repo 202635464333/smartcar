@@ -17,59 +17,90 @@ sensor_analyzer.py  —— 上一届学长留下的"能用"的脚本
 """
 
 import csv
-import os
+import sys           #处理系统级错误
+import argparse      #解析命令行参数
 
 INPUT_FILE = "sensor_data.csv"
 OUTPUT_FILE = "cleaned_data.csv"
 OUTPUT_DIR = "out"  # 输出目录
 
-data = []
-times = []
-cleaned = []
-rows = []
-
 print("=== 传感器数据分析 ===")
 
 # --- 读取数据 ---
-with open(INPUT_FILE, "r") as f:
-    reader = csv.DictReader(f)
-
-    for row in reader:
-        t = float(row["time"])
-        v = float(row["value"])
-        times.append(t)
-        data.append(v)
-        rows.append([t, v])
-
-print("共读取 %d 条数据" % len(data))
-
+def load_data(input_path):          # ← 改名 + 吃参数
+    rows = []                       # ← 函数内部建列表
+    with open(input_path, "r") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            t = float(row["time"])
+            v = float(row["value"])
+            rows.append([t, v])
+    print("共读取 %d 条数据" % len(rows))
+    return rows
+      
 # --- 计算平均值 ---
-total = 0
-for v in data:
-    total += v
-mean = total / len(data)
+def calculate_mean(rows):
+    total = 0
+    for row in rows:
+        total += row[1]
+    mean = total / len(rows)
+    return mean
 
 # --- 计算标准差 ---
-acc = 0
-for v in data:
-    acc += (v - mean)**2
-std = acc**0.5 / len(data)**0.5
+def calculate_std(rows, mean):
+    acc = 0
+    for row in rows:
+        acc += (row[1] - mean)**2
+    std = acc**0.5 / len(rows)**0.5
+    return std
 
 # --- 剔除离群值 ---
-for row in rows:
-    if abs(row[1] - mean) <= 2 * std:
-        cleaned.append(row)
+def remove_outliers(rows, mean, std):
+    cleaned = []
+    for row in rows:
+        if abs(row[1] - mean) <= 2 * std:
+            cleaned.append(row)
+    return cleaned
 
 # --- 输出清洗后的数据 ---
-output_path = OUTPUT_FILE  
-with open(output_path, "w") as f:
-    writer = csv.writer(f)
-    writer.writerow(["time", "value"])
-    for row in cleaned:
-        writer.writerow(row)
+def save_cleaned_data(cleaned, output_path):
+    output_path = OUTPUT_FILE  
+    with open(output_path, "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["time", "value"])
+        for row in cleaned:
+            writer.writerow(row)
+    return output_path
 
-print("均值 mean = %.4f" % mean)
-print("标准差 std = %.4f" % std)
-print("清洗后剩余 %d 条" % len(cleaned))
-print("已保存到 %s" % output_path)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", default=INPUT_FILE)
+    parser.add_argument("--output", default=OUTPUT_FILE)
+    args = parser.parse_args()
+    try:
+        rows = load_data(args.input)
+        mean = calculate_mean(rows)
+        std = calculate_std(rows, mean)
+        cleaned = remove_outliers(rows, mean, std)
+        output_path = save_cleaned_data(cleaned, args.output)  
+        print("均值 mean = %.4f" % mean)
+        print("标准差 std = %.4f" % std)
+        print("清洗后剩余 %d 条" % len(cleaned))
+        print("已保存到 %s" % output_path)
+    except FileNotFoundError:
+        print("错误：找不到数据文件")
+        sys.exit(1)
+    except KeyError:
+        print("错误：数据文件缺少 time 或 value 列")
+        sys.exit(1)
+    except ValueError:
+        print("错误：数据中存在无法转换为数字的内容")
+        sys.exit(1)
+    except ZeroDivisionError:
+        print("错误：数据文件为空，无法计算")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
 
