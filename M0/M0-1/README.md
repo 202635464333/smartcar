@@ -27,6 +27,7 @@
 3. 使用鱼香ROS一键脚本安装 ROS2 Humble（自动换源：清华系统源 + 中科大 ROS 源），并自动写入 `~/.bashrc`
 4. `ros2 run demo_nodes_cpp talker` + `ros2 run demo_nodes_py listener` 双终端验证，listener 持续收到 "Hello World" 消息
 5. 补装：`python3-pip`、uv、VS Code 及四个插件、SSH 密钥
+6. 安装 `openssh-server` 并完成 SSH 免密登录（`ssh localhost` 不再询问密码），详见下方「坑 6 / 坑 7」与「远端登录验证实录」
 
 ## 踩坑实录
 
@@ -72,6 +73,77 @@ git config --global https.proxy http://$(ip route show default | awk '{print $3}
 现象：本地建了 M0/ M1/ 目录，但 GitHub 网页上看不到。
 
 原因：Git 不跟踪空目录。解决：每个目录放 README 占位文件后再提交。
+
+### 坑 6：装完 openssh-server 却连不上
+
+安装完 `openssh-server` 直接 `ssh localhost` 会被拒绝，因为 **WSL 里安装不会自动拉起常驻服务**，这一点和物理机不同。
+
+定位方法两条命令：
+
+```
+pgrep -x sshd                 # 无输出 = 服务没起来
+ss -lntp | grep :22           # 无输出 = 22 端口没人监听
+```
+
+解决：`sudo service ssh start` 手动启动。本次安装过程中由 `sshd.socket` 自动拉起了监听进程，`ss` 已能看到 `0.0.0.0:22` 处于 LISTEN 状态。
+
+顺带记一句安装器打印的 `rescue-ssh.target is a disabled or a static unit` —— 它**不是报错**，只是说明 WSL 不用这个 rescue target 来管 ssh，忽略即可。
+
+### 坑 7：`ssh-keygen` 提示 Overwrite —— 差点把 GitHub 的钥匙作废
+
+执行 `ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519` 时出现：
+
+```
+/home/lenovo/.ssh/id_ed25519 already exists.
+Overwrite (y/n)?
+```
+
+**必须选 `n`。** 这把密钥的公钥此前已经添加到 GitHub 账号里，本仓库的全部推送都靠它完成；一旦覆盖重新生成，远端存的是旧公钥，`git push` 会直接被拒（报 `Permission denied (publickey)`）。
+
+正确做法：密钥已存在就**跳过这一步**，直接 `ssh-copy-id` 把现有公钥分发给目标主机。一把私钥可以同时用于 GitHub 登录和 SSH 远程登录，互不影响 ——这就是公钥密码学的设计目的。
+
+## 远端登录验证实录
+
+以下为本机实测（用 localhost 当"远端"，完整验证 ssh / scp / rsync 三条链路）：
+
+```
+$ ssh localhost 'echo 免密登录成功; whoami; hostname'
+免密登录成功
+lenovo
+LAPTOP-1BV9TIK6
+
+$ scp ~/smartcar/M0/M0-1/README.md localhost:/tmp/m01_readme.md
+README.md                    100% 5052     3.3MB/s   00:00
+
+$ rsync -av ~/smartcar/M0/M0-1/ localhost:/tmp/m01_test/
+sending incremental file list
+sent 81 bytes  received 12 bytes  186.00 bytes/sec
+total size is 5,052  speedup is 54.32
+
+$ ssh localhost 'ls -la /tmp/m01_readme.md /tmp/m01_test/'
+-rw-r--r-- 1 lenovo lenovo 5052 Oct 17 21:48 /tmp/m01_readme.md
+-rw-r--r-- 1 lenovo lenovo 5052 Oct  2 20:54 /tmp/m01_test/README.md
+```
+
+三条链路全程**未询问密码**，退出码均为 0。
+
+**权限核对**（这一项错了，sshd 会拒绝使用公钥，回退到密码登录甚至直接拒绝）：
+
+```
+$ stat -c "%a %n" ~/.ssh ~/.ssh/authorized_keys
+700 /home/lenovo/.ssh
+600 /home/lenovo/.ssh/authorized_keys
+```
+
+`700` 表示只有本人能进入该目录，`600` 表示只有本人能读写这个密钥列表 —— 两者都符合 sshd 的硬性要求。
+
+**三个容易误判的现象：**
+
+- `ssh localhost '命令'` 执行完**立刻断开**回到本地提示符，这**不是异常**。SSH 的正常行为就是远程命令跑完会话即结束；要维持交互连接就去掉后面的命令，或加 `-t` 参数。
+- 首次连接询问 `Are you sure you want to continue connecting (yes/no)?`，要打完整的 **`yes`**（不是缩写 `y`），主机指纹才会写进 `~/.ssh/known_hosts` —— 这也是 `check_env.sh` 的一个检查点。
+- 输入密码时屏幕上**什么都不显示**，这是终端的安全设计，不是键盘坏了，照常打完回车即可。
+
+补充：`ssh-copy-id` 的作用是把**公钥**追加进目标主机的 `~/.ssh/authorized_keys`；私钥 `id_ed25519` 从头到尾没有离开本机，所以即使目标被别人拿到也安全。
 
 ### 其他小坑
 
