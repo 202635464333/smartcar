@@ -15,6 +15,7 @@ import yaml
 import random
 import time
 import json
+
 GREEN  = "\033[32m"      # 成功：绿
 RED    = "\033[31m"      # 失败：红
 YELLOW = "\033[33m"      # 重试：黄
@@ -45,15 +46,15 @@ while len(status) < len(data["tasks"]) and not stopped:
             break                               # 跳出 for
 
         name = task["name"]
-        if name in status:                     # 已经有结果了，跳过
+        if name in status:                      # 已经有结果了，跳过
             continue
 
-        can_run = True                         # 开关：本轮能不能执行它
+        can_run = True                          # 开关：本轮能不能执行它
         for dep in task["dependencies"]:
-            if dep not in status:              # 前置还没出结果 → 先等
+            if dep not in status:               # 前置还没出结果 → 先等，这轮不做它
                 can_run = False
                 break
-            if status[dep] != "SUCCESS":       # 前置失败/被跳过 → 本任务跳过
+            if status[dep] != "SUCCESS":        # 前置失败/被跳过 → 本任务跳过
                 status[name] = "SKIPPED"
                 print(f"{BLUE}[SKIPPED]{RESET} {name}（前置 {dep} 未成功）")
                 records.append({"name": name, "status": "SKIPPED",
@@ -61,7 +62,7 @@ while len(status) < len(data["tasks"]) and not stopped:
                 can_run = False
                 break
 
-        if not can_run:                        # 不能执行（要么等，要么已跳过）
+        if not can_run:                         # 不能执行（要么等，要么已跳过）
             continue
 
         # 到这里：所有前置都 SUCCESS，可以执行 + 重试
@@ -85,8 +86,6 @@ while len(status) < len(data["tasks"]) and not stopped:
         records.append({"name": name, "status": status[name], "attempts": n,
                         "duration": round(time.time() - task_start, 2)})
 
-            
-
 report = {
     "timeout": timeout,
     "total_duration": round(time.time() - start, 2),
@@ -96,5 +95,6 @@ report = {
 
 with open("report.json", "w", encoding="utf-8") as f:
     json.dump(report, f, ensure_ascii=False, indent=2)
+
 print()
 print(f"报告已写入 report.json，总耗时 {report['total_duration']} 秒")
