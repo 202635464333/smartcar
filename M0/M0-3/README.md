@@ -84,6 +84,10 @@ python3 sensor_analyzer.py --input sensor_data.csv --output cleaned_data.csv
 
 ---
 
+## 四·五、原版备份
+
+`sensor_analyzer_original.py` 是从 git 首次提交（`4d6e998`）导出的**学长原版脚本**，未做任何改动，供答辩时与修复后的版本当场对照（"改前 vs 改后"）。修复过程的差异以 git 提交历史为准，一处缺陷一笔提交。
+
 ## 五、AI 使用声明
 
 本题约为**一半的工作由 AI 完成**，如实说明如下：
