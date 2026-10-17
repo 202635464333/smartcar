@@ -14,6 +14,13 @@
 import yaml
 import random
 import time
+GREEN  = "\033[32m"      # 成功：绿
+RED    = "\033[31m"      # 失败：红
+YELLOW = "\033[33m"      # 重试：黄
+BLUE   = "\033[34m"      # 跳过：蓝
+PURPLE = "\033[35m"      # 超时：紫
+RESET  = "\033[0m"       # 恢复原色（必须加）
+
 
 with open("tasks_demo.yaml", "r", encoding="utf-8") as f:
     data = yaml.safe_load(f)
@@ -29,7 +36,7 @@ while len(status) < len(data["tasks"]) and not stopped:
             for t in data["tasks"]:             # 还没出结果的，全部标 TIMEOUT
                 if t["name"] not in status:
                     status[t["name"]] = "TIMEOUT"
-                    print(f"超时：{t['name']} 未执行")
+                    print(f"{PURPLE}[TIMEOUT]{RESET} {t['name']} 未执行")
             stopped = True                      # 拨开关，让 while 也停下来
             break                               # 跳出 for
 
@@ -44,7 +51,7 @@ while len(status) < len(data["tasks"]) and not stopped:
                 break
             if status[dep] != "SUCCESS":       # 前置失败/被跳过 → 本任务跳过
                 status[name] = "SKIPPED"
-                print(f"跳过：{name}（前置 {dep} 未成功）")
+                print(f"{BLUE}[SKIPPED]{RESET} {name}（前置 {dep} 未成功）")
                 can_run = False
                 break
 
@@ -56,15 +63,17 @@ while len(status) < len(data["tasks"]) and not stopped:
         for n in range(1, 4):
             time.sleep(task["duration"])
             if random.random() < task["success_rate"]:
-                print(f"成功：{name}（第 {n} 次尝试）")
+                print(f"{GREEN}[SUCCESS]{RESET} {name}（第 {n} 次尝试）")
                 ok = True
                 break
-            print(f"失败：{name} 第 {n} 次尝试")
+            if n < 3:
+                print(f"{YELLOW}[RETRY]{RESET} {name} 第 {n} 次尝试失败，准备重试")
+            else:
+                print(f"{RED}[FAILED]{RESET} {name} 连续 3 次失败")
 
         if ok:
             status[name] = "SUCCESS"
         else:
             status[name] = "FAILED"
-            print(f"{name} 连续 3 次失败")
 
             
