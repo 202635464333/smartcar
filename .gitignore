@@ -6,5 +6,3 @@ build/
 install/
 log/
 
-# M0-4 运行产物（每次执行都会变）
-M0/M0-4/report.json

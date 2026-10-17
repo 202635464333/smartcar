@@ -61,7 +61,7 @@ python3 scheduler.py --config tasks_demo.json --timeout 3 --report result_timeou
 
 - 配置换成 `.json`（JSON 是 YAML 的子集，`yaml.safe_load` 可以直接解析）
 - 3 秒内没跑完的任务全部标记 `TIMEOUT`
-- 报告照常生成，`"timed_out": true`，进程以退出码 `1` 结束
+- 报告照常生成，`"timeout": true`，进程以退出码 `1` 结束
 
 ---
 
@@ -147,27 +147,31 @@ tasks:
 
 ```json
 {
-  "timeout": 15.0,
+  "timeout": false,
   "total_duration": 12.39,
-  "timed_out": false,
   "tasks": [
-    { "name": "Init",         "status": "SUCCESS", "attempts": 1, "duration": 0.5 },
-    { "name": "Navigate",     "status": "SUCCESS", "attempts": 1, "duration": 3.38 },
-    { "name": "AvoidObstacle","status": "FAILED",  "attempts": 3, "duration": 6.0 },
-    { "name": "Place",        "status": "SKIPPED", "attempts": 0, "duration": 0 },
-    { "name": "ReturnHome",   "status": "SKIPPED", "attempts": 0, "duration": 0 }
+    { "name": "Init",         "status": "SUCCESS", "attempts": 1, "duration": 0.5,
+      "started_at": 1792243938.92, "ended_at": 1792243939.42 },
+    { "name": "Navigate",     "status": "SUCCESS", "attempts": 1, "duration": 2.5,
+      "started_at": 1792243939.42, "ended_at": 1792243941.92 },
+    { "name": "AvoidObstacle","status": "FAILED",  "attempts": 3, "duration": 6.0,
+      "started_at": 1792243941.93, "ended_at": 1792243947.93 },
+    { "name": "Place",        "status": "SKIPPED", "attempts": 0, "duration": 0,
+      "started_at": null, "ended_at": null },
+    { "name": "ReturnHome",   "status": "SKIPPED", "attempts": 0, "duration": 0,
+      "started_at": null, "ended_at": null }
   ]
 }
 ```
 
 | 字段 | 说明 |
 | :-- | :-- |
-| `timeout` | 本次生效的超时阈值 |
+| `timeout` | **布尔值**：本次运行是否超时（按官方契约，现场按此核对） |
 | `total_duration` | 程序从开始到结束的**真实墙钟耗时**（秒） |
-| `timed_out` | 是否因超时提前终止 |
 | `tasks[].status` | 最终状态，只有 `SUCCESS` / `FAILED` / `SKIPPED` / `TIMEOUT` 四种 |
 | `tasks[].attempts` | 实际尝试次数；未执行的任务为 0 |
 | `tasks[].duration` | 该任务从开始到结束的真实耗时（含重试等待） |
+| `tasks[].started_at` / `ended_at` | 该任务的起止 **Unix 时间戳**；未执行的任务为 `null` |
 
 `duration` 记的是实测时间而不是配置里的 `duration`，因为重试会让它翻倍，WSL 的系统调度也会带来几十毫秒到几百毫秒的抖动——报告要反映真实开销，而不是照抄预期值。因此**同 seed 两次运行，状态和尝试次数完全一致，`total_duration` 允许有小幅差异**。
 
@@ -178,9 +182,10 @@ tasks:
 1. **拓扑排序**：用 `status` 字典记录已完成的任务，`while` 循环反复扫描整份配置，每轮只执行"前置全部成功"的任务；扫描到没有任何新进展时即结束。
 2. **重试**：每个任务 `for n in range(1, 4)`，成功立即 `break`；3 次都失败则记 `FAILED`。
 3. **失败传播**：判断前置时用 `status[dep] != "SUCCESS"`，失败会沿着依赖链自动向上下游传染，无需额外的传播循环。
-4. **超时控制**：`start = time.time()` 掐表，**每处理一个任务前**检查一次墙钟时间，超过阈值就把尚未出结果的任务批量标 `TIMEOUT` 并停止调度。
+4. **超时控制**：`start = time.time()` 掐表，两个检查点——**每个任务处理前**与**每次 `sleep` 之后**各检查一次墙钟时间（官方设计提示）；执行中的任务一旦超时立即标 `TIMEOUT`，尚未出结果的任务全部终止，`timeout` 记为 `true` 并以退出码 1 结束。
 5. **卡死检测**：如果一整轮扫描下来没有任何任务产出结果，说明依赖关系成环，打印卡住的任务名并以退出码 1 结束，避免 `while` 空转死循环。
-6. **可复现**：`random.seed(seed)` 只在程序开头调用一次，固定随机数序列的起点，从而固定每个任务抽到的判定值。
+6. **非 TTY 降级**：重定向到文件/管道时（`sys.stdout.isatty()` 为假）自动关闭颜色码，避免日志里全是 `[` 转义符。
+7. **可复现**：`random.seed(seed)` 只在程序开头调用一次，固定随机数序列的起点，从而固定每个任务抽到的判定值。
 
 ---
 
@@ -196,7 +201,7 @@ tasks:
 | `duration` 为负 / `success_rate` 超出 0~1 | 指出具体任务与非法值 | 1 |
 | 依赖了不存在的任务名 | `[ERROR] 任务 A 依赖了不存在的任务：xxx` | 1 |
 | 依赖关系成环 | 列出卡住的任务名 | 1 |
-| 超时提前终止 | 报告正常生成，`timed_out: true` | 1 |
+| 超时提前终止 | 报告正常生成，`timeout: true` | 1 |
 | 全部正常结束 | 打印报告路径与总耗时 | 0 |
 
 所有异常都输出中文提示，**不抛 Traceback**。退出码 1 与 2 分开，便于脚本区分"运行出错"和"命令敲错"。
@@ -216,7 +221,7 @@ tasks:
 | 7 | 缺少 `success_rate` | 指出缺失字段 | 1 |
 | 8 | `success_rate: 1.5` | 指出越界 | 1 |
 | 9 | `--timeout 0` | 提示必须大于 0 | 1 |
-| 10 | `--timeout 3` | 剩余任务标 TIMEOUT，`timed_out: true` | 1 |
+| 10 | `--timeout 3` | 剩余任务标 TIMEOUT，`timeout: true` | 1 |
 | 11 | 缺 `--config` | argparse 报错 | 2 |
 | 12 | 配置换成 `.json` | 与 yaml 结果一致 | 0 |
 

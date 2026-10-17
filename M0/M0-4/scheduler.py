@@ -12,6 +12,9 @@ BLUE   = "\033[34m"      # 跳过：蓝
 PURPLE = "\033[35m"      # 超时：紫
 RESET  = "\033[0m"       # 恢复原色（必须加）
 
+if not sys.stdout.isatty():     # 非 TTY（重定向到文件/管道）时降级：不加颜色码
+    GREEN = RED = YELLOW = BLUE = PURPLE = RESET = ""
+
 
 parser = argparse.ArgumentParser(description="TaskScheduler：按依赖关系调度一批模拟任务")
 parser.add_argument("--config", required=True, help="任务配置文件，支持 .yaml / .yml / .json")
@@ -89,17 +92,24 @@ status = {}                                     # 记每个任务的最终结果
 records = []                                    # 每个任务的详细记录，最后写进报告
 stopped = False                                 # 开关：是否已被迫收工
 
+
+def finish_timeout():
+    """超时收尾：立即终止，把还没出结果的任务全部标 TIMEOUT"""
+    for t in data["tasks"]:
+        nm = t["name"]
+        if nm not in status:
+            status[nm] = "TIMEOUT"
+            print(f"{PURPLE}[TIMEOUT]{RESET} {nm} 未执行")
+            records.append({"name": nm, "status": "TIMEOUT",
+                            "attempts": 0, "duration": 0,
+                            "started_at": None, "ended_at": None})
+
+
 while len(status) < len(data["tasks"]) and not stopped:
     before = len(status)                        # 这一轮开始前，已经有几个任务出结果了
     for task in data["tasks"]:
-        if time.time() - start > timeout:       # 每个任务处理前，都看一次表
-            for t in data["tasks"]:             # 还没出结果的，全部标 TIMEOUT
-                nm = t["name"]
-                if nm not in status:
-                    status[nm] = "TIMEOUT"
-                    print(f"{PURPLE}[TIMEOUT]{RESET} {nm} 未执行")
-                    records.append({"name": nm, "status": "TIMEOUT",
-                                    "attempts": 0, "duration": 0})
+        if time.time() - start > timeout:       # 检查点一：每个任务处理前，看一次表
+            finish_timeout()                    # 还没出结果的，全部标 TIMEOUT
             stopped = True                      # 拨开关，让 while 也停下来
             break                               # 跳出 for
 
@@ -116,7 +126,8 @@ while len(status) < len(data["tasks"]) and not stopped:
                 status[name] = "SKIPPED"
                 print(f"{BLUE}[SKIPPED]{RESET} {name}（前置 {dep} 未成功）")
                 records.append({"name": name, "status": "SKIPPED",
-                                "attempts": 0, "duration": 0})
+                                "attempts": 0, "duration": 0,
+                                "started_at": None, "ended_at": None})
                 can_run = False
                 break
 
@@ -124,10 +135,15 @@ while len(status) < len(data["tasks"]) and not stopped:
             continue
 
         # 到这里：所有前置都 SUCCESS，可以执行 + 重试
-        task_start = time.time()                # 这个任务单独计时
+        task_start = time.time()                # 这个任务单独计时（绝对时间戳）
         ok = False
+        ran_out = False                         # 这个任务执行到一半超时了吗
         for n in range(1, 4):
             time.sleep(task["duration"])
+            if time.time() - start > timeout:   # 检查点二：sleep 之后再看一次表
+                print(f"{PURPLE}[TIMEOUT]{RESET} {name} 执行中超时，立即终止")
+                ran_out = True
+                break
             if random.random() < task["success_rate"]:
                 print(f"{GREEN}[SUCCESS]{RESET} {name}（第 {n} 次尝试）")
                 ok = True
@@ -137,12 +153,19 @@ while len(status) < len(data["tasks"]) and not stopped:
             else:
                 print(f"{RED}[FAILED]{RESET} {name} 连续 3 次失败")
 
-        if ok:
-            status[name] = "SUCCESS"
+        ended = time.time()
+        if ran_out:                             # 执行到一半被掐：本任务记 TIMEOUT
+            status[name] = "TIMEOUT"
+            records.append({"name": name, "status": "TIMEOUT", "attempts": n,
+                            "duration": round(ended - task_start, 2),
+                            "started_at": task_start, "ended_at": ended})
+            stopped = True
+            finish_timeout()                    # 剩下的任务也全部终止
         else:
-            status[name] = "FAILED"
-        records.append({"name": name, "status": status[name], "attempts": n,
-                        "duration": round(time.time() - task_start, 2)})
+            status[name] = "SUCCESS" if ok else "FAILED"
+            records.append({"name": name, "status": status[name], "attempts": n,
+                            "duration": round(ended - task_start, 2),
+                            "started_at": task_start, "ended_at": ended})
 
     # 一整轮扫完，一个任务都没出结果 → 说明卡住了（依赖成环）
     if len(status) == before and not stopped:
@@ -155,9 +178,8 @@ while len(status) < len(data["tasks"]) and not stopped:
         sys.exit(1)
 
 report = {
-    "timeout": timeout,
+    "timeout": stopped or (time.time() - start > timeout),   # 布尔：是否超时（按契约）
     "total_duration": round(time.time() - start, 2),
-    "timed_out": stopped,
     "tasks": records,
 }
 
@@ -172,5 +194,5 @@ total = report["total_duration"]
 print()
 print(f"报告已写入 {args.report}，总耗时 {total} 秒")
 
-if stopped:                                     # 超时属于异常收工，退出码给 1
+if report["timeout"]:                           # 超时属于异常收工，退出码给 1
     sys.exit(1)
