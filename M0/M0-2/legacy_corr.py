@@ -6,7 +6,7 @@ import argparse      #解析命令行参数
 import os            #拼接文件路径
 
 def load_config(config_yaml): 
-    with open(config_yaml) as f:    #打开了某个文件
+    with open(config_yaml, encoding="utf-8") as f:    #打开了某个文件
         cfg = yaml.safe_load(f)     #safe_load把文件对象f里的YAML文本解析成Python对象
         csv_path = cfg["input_csv"]   #大字典里的一个数据
         # 如果按当前所在目录找不到数据文件，就到配置文件所在的目录里再找一次
@@ -14,13 +14,14 @@ def load_config(config_yaml):
             csv_path = os.path.join(os.path.dirname(config_yaml), csv_path)
         col_x = cfg["columns"]["x"]   #大字典套一个小字典
         col_y = cfg["columns"]["y"]
-    return csv_path, col_x, col_y
+    verbose = cfg.get("task", {}).get("verbose", True)   # 是否打印中间量，默认打印
+    return csv_path, col_x, col_y, verbose
 
 def load_csv(csv_path, col_x, col_y):
     xs = []      #定义一个新变量(空列表)
     ys = []
 
-    with open(csv_path) as f:
+    with open(csv_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)    #csv.DictReader把f中遍历成字典
         for row in reader:
             xs.append(float(row[col_x]))  #字典套字典，提取数据(float)
@@ -62,13 +63,14 @@ def main():
     args = parser.parse_args()
 
     try:
-        csv_path, col_x, col_y = load_config(args.config)
+        csv_path, col_x, col_y, verbose = load_config(args.config)
         xs, ys, n = load_csv(csv_path, col_x, col_y)
         mean_x, mean_y = mean(xs, ys, n)
         r = correlation(xs, ys, n, mean_x, mean_y)
-        print("n =", n)
-        print("mean_x =", mean_x)
-        print("mean_y =", mean_y)
+        if verbose:                              # 由配置里的 task.verbose 控制是否打印中间量
+            print("n =", n)
+            print("mean_x =", mean_x)
+            print("mean_y =", mean_y)
         print("r =", r)
     except FileNotFoundError as e:
         print(f"错误：找不到文件 {e.filename}，请检查路径")
