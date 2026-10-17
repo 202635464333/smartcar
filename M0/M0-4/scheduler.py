@@ -1,11 +1,12 @@
 import argparse
+import sys
 import yaml
 import random
 import time
 import json
 
 GREEN  = "\033[32m"      # 成功：绿
-RED    = "\033[31m"      # 失败：红
+RED    = "\033[31m"      # 失败 / 报错：红
 YELLOW = "\033[33m"      # 重试：黄
 BLUE   = "\033[34m"      # 跳过：蓝
 PURPLE = "\033[35m"      # 超时：紫
@@ -22,16 +23,74 @@ args = parser.parse_args()
 if args.seed is not None:                   # 填了种子，随机结果就可复现
     random.seed(args.seed)
 
-with open(args.config, "r", encoding="utf-8") as f:
-    data = yaml.safe_load(f)
+# ---------- 读配置：文件不存在、格式写错，都给中文提示，而不是甩一堆 traceback ----------
+try:
+    with open(args.config, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+except FileNotFoundError:
+    print(f"{RED}[ERROR]{RESET} 找不到配置文件：{args.config}")
+    sys.exit(1)
+except yaml.YAMLError:
+    print(f"{RED}[ERROR]{RESET} 配置文件语法有误（YAML/JSON 格式不对）：{args.config}")
+    sys.exit(1)
+except UnicodeDecodeError:
+    print(f"{RED}[ERROR]{RESET} 配置文件不是 UTF-8 编码，无法读取：{args.config}")
+    sys.exit(1)
 
+# ---------- 检查配置内容是否完整 ----------
+if not data or "tasks" not in data:
+    print(f"{RED}[ERROR]{RESET} 配置文件里没有 tasks 列表：{args.config}")
+    sys.exit(1)
+
+if len(data["tasks"]) == 0:
+    print(f"{RED}[ERROR]{RESET} 配置文件里的 tasks 列表是空的：{args.config}")
+    sys.exit(1)
+
+for task in data["tasks"]:
+    for key in ["name", "duration", "success_rate", "dependencies"]:
+        if key not in task:
+            print(f"{RED}[ERROR]{RESET} 有任务缺少字段 {key}：{task}")
+            sys.exit(1)
+    if task["dependencies"] is None:        # 写成 "dependencies:" 后面留空，按没有依赖处理
+        task["dependencies"] = []
+    if task["duration"] < 0:
+        print(f"{RED}[ERROR]{RESET} 任务 {task['name']} 的 duration 不能是负数")
+        sys.exit(1)
+    if task["success_rate"] < 0 or task["success_rate"] > 1:
+        print(f"{RED}[ERROR]{RESET} 任务 {task['name']} 的 success_rate 必须在 0~1 之间，"
+              f"当前是 {task['success_rate']}")
+        sys.exit(1)
+
+names = []                                  # 把所有任务名收起来，用来查"依赖了不存在的任务"
+for task in data["tasks"]:
+    names.append(task["name"])
+
+for task in data["tasks"]:
+    for dep in task["dependencies"]:
+        if dep not in names:
+            print(f"{RED}[ERROR]{RESET} 任务 {task['name']} 依赖了不存在的任务：{dep}")
+            sys.exit(1)
+
+# ---------- 准备开工 ----------
 start = time.time()                                     # 掐表：记下开始的那一刻
 timeout = args.timeout if args.timeout is not None else data.get("timeout", 15)
+
+try:
+    timeout = float(timeout)
+except (TypeError, ValueError):
+    print(f"{RED}[ERROR]{RESET} 超时时间不是数字：{timeout}")
+    sys.exit(1)
+
+if timeout <= 0:
+    print(f"{RED}[ERROR]{RESET} 超时时间必须大于 0，当前是 {timeout}")
+    sys.exit(1)
 
 status = {}                                     # 记每个任务的最终结果
 records = []                                    # 每个任务的详细记录，最后写进报告
 stopped = False                                 # 开关：是否已被迫收工
+
 while len(status) < len(data["tasks"]) and not stopped:
+    before = len(status)                        # 这一轮开始前，已经有几个任务出结果了
     for task in data["tasks"]:
         if time.time() - start > timeout:       # 每个任务处理前，都看一次表
             for t in data["tasks"]:             # 还没出结果的，全部标 TIMEOUT
@@ -85,6 +144,16 @@ while len(status) < len(data["tasks"]) and not stopped:
         records.append({"name": name, "status": status[name], "attempts": n,
                         "duration": round(time.time() - task_start, 2)})
 
+    # 一整轮扫完，一个任务都没出结果 → 说明卡住了（依赖成环）
+    if len(status) == before and not stopped:
+        stuck = []
+        for t in data["tasks"]:
+            if t["name"] not in status:
+                stuck.append(t["name"])
+        print(f"{RED}[ERROR]{RESET} 任务卡住了：依赖关系成环，谁也等不到谁")
+        print("卡住的任务：" + "、".join(stuck))
+        sys.exit(1)
+
 report = {
     "timeout": timeout,
     "total_duration": round(time.time() - start, 2),
@@ -92,9 +161,16 @@ report = {
     "tasks": records,
 }
 
-with open(args.report, "w", encoding="utf-8") as f:
-    json.dump(report, f, ensure_ascii=False, indent=2)
+try:
+    with open(args.report, "w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+except OSError:
+    print(f"{RED}[ERROR]{RESET} 报告文件写不进去：{args.report}（目录不存在或没有权限）")
+    sys.exit(1)
 
 total = report["total_duration"]
 print()
 print(f"报告已写入 {args.report}，总耗时 {total} 秒")
+
+if stopped:                                     # 超时属于异常收工，退出码给 1
+    sys.exit(1)
