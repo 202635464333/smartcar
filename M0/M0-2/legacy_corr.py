@@ -62,6 +62,7 @@ def main():
     parser.add_argument("--config", required=True, help="配置文件路径")
     args = parser.parse_args()
 
+    csv_path = args.config        # 先兜个底：万一配置读取阶段就出错，下面的提示里也有文件名可用
     try:
         csv_path, col_x, col_y, verbose = load_config(args.config)
         xs, ys, n = load_csv(csv_path, col_x, col_y)
@@ -78,8 +79,15 @@ def main():
     except KeyError as e:
         print(f"错误：数据中不存在配置的列 {e}，请检查 config.yaml 的 columns 字段")
         sys.exit(1)
+    except UnicodeDecodeError:
+        print(f"错误：{csv_path} 不是 UTF-8 编码（多半是 Excel 导出的 GBK 文件）")
+        print("       先转成 UTF-8 再跑：iconv -f GBK -t UTF-8 原文件.csv > 新文件.csv")
+        sys.exit(1)
     except ValueError as e:
         print("错误：数据中存在无法转换为数字的内容")
+        sys.exit(1)
+    except TypeError:
+        print(f"错误：{csv_path} 里有一行的列数比表头少（缺字段），请补齐或删掉这一行")
         sys.exit(1)
     except ZeroDivisionError:
         print("错误：数据为空或某列取值恒定，相关系数无定义")

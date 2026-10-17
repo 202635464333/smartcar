@@ -91,9 +91,17 @@ def main():
         sys.exit(1)
     except KeyError:
         print("错误：数据文件缺少 time 或 value 列")
+        print("       列名对不上时改表头再跑：sed -i '1s/.*/time,value/' 数据.csv")
+        sys.exit(1)
+    except UnicodeDecodeError:
+        print(f"错误：{args.input} 不是 UTF-8 编码（多半是 Excel 导出的 GBK 文件）")
+        print("       先转成 UTF-8 再跑：iconv -f GBK -t UTF-8 原文件.csv > 新文件.csv")
         sys.exit(1)
     except ValueError:
         print("错误：数据中存在无法转换为数字的内容")
+        sys.exit(1)
+    except TypeError:
+        print(f"错误：{args.input} 里有一行只有 time、没有 value（列数比表头少），请补齐或删掉这一行")
         sys.exit(1)
     except ZeroDivisionError:
         print("错误：数据文件为空，无法计算")
