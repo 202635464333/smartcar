@@ -14,6 +14,7 @@
 import yaml
 import random
 import time
+import json
 GREEN  = "\033[32m"      # 成功：绿
 RED    = "\033[31m"      # 失败：红
 YELLOW = "\033[33m"      # 重试：黄
@@ -29,6 +30,7 @@ start = time.time()            # 掐表：记下开始的那一刻
 timeout = data["timeout"]      # 从清单读超时上限
 
 status = {}                                     # 记每个任务的最终结果
+records = []                                    # 每个任务的详细记录，最后写进报告
 stopped = False                                 # 开关：是否已被迫收工
 while len(status) < len(data["tasks"]) and not stopped:
     for task in data["tasks"]:
@@ -37,6 +39,8 @@ while len(status) < len(data["tasks"]) and not stopped:
                 if t["name"] not in status:
                     status[t["name"]] = "TIMEOUT"
                     print(f"{PURPLE}[TIMEOUT]{RESET} {t['name']} 未执行")
+                    records.append({"name": t["name"], "status": "TIMEOUT",
+                                    "attempts": 0, "duration": 0})
             stopped = True                      # 拨开关，让 while 也停下来
             break                               # 跳出 for
 
@@ -52,6 +56,8 @@ while len(status) < len(data["tasks"]) and not stopped:
             if status[dep] != "SUCCESS":       # 前置失败/被跳过 → 本任务跳过
                 status[name] = "SKIPPED"
                 print(f"{BLUE}[SKIPPED]{RESET} {name}（前置 {dep} 未成功）")
+                records.append({"name": name, "status": "SKIPPED",
+                                "attempts": 0, "duration": 0})
                 can_run = False
                 break
 
@@ -59,6 +65,7 @@ while len(status) < len(data["tasks"]) and not stopped:
             continue
 
         # 到这里：所有前置都 SUCCESS，可以执行 + 重试
+        task_start = time.time()                # 这个任务单独计时
         ok = False
         for n in range(1, 4):
             time.sleep(task["duration"])
@@ -75,5 +82,19 @@ while len(status) < len(data["tasks"]) and not stopped:
             status[name] = "SUCCESS"
         else:
             status[name] = "FAILED"
+        records.append({"name": name, "status": status[name], "attempts": n,
+                        "duration": round(time.time() - task_start, 2)})
 
             
+
+report = {
+    "timeout": timeout,
+    "total_duration": round(time.time() - start, 2),
+    "timed_out": stopped,
+    "tasks": records,
+}
+
+with open("report.json", "w", encoding="utf-8") as f:
+    json.dump(report, f, ensure_ascii=False, indent=2)
+print()
+print(f"报告已写入 report.json，总耗时 {report['total_duration']} 秒")
