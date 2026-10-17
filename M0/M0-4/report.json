@@ -1,46 +1,46 @@
 {
   "timeout": false,
-  "total_duration": 12.51,
+  "total_duration": 12.99,
   "tasks": [
     {
       "name": "Init",
       "status": "SUCCESS",
       "attempts": 1,
       "duration": 0.5,
-      "started_at": 1792244064.0479033,
-      "ended_at": 1792244064.5480504
+      "started_at": 1792246853.03,
+      "ended_at": 1792246853.53
     },
     {
       "name": "Navigate",
       "status": "SUCCESS",
       "attempts": 1,
-      "duration": 3.5,
-      "started_at": 1792244064.5480707,
-      "ended_at": 1792244068.0470996
+      "duration": 2.5,
+      "started_at": 1792246853.53,
+      "ended_at": 1792246856.03
     },
     {
       "name": "DetectQR",
       "status": "SUCCESS",
       "attempts": 1,
-      "duration": 1.5,
-      "started_at": 1792244068.047119,
-      "ended_at": 1792244069.5485578
+      "duration": 2.98,
+      "started_at": 1792246856.03,
+      "ended_at": 1792246859.02
     },
     {
       "name": "Grasp",
       "status": "SUCCESS",
       "attempts": 1,
       "duration": 1.0,
-      "started_at": 1792244069.5485773,
-      "ended_at": 1792244070.549667
+      "started_at": 1792246859.02,
+      "ended_at": 1792246860.02
     },
     {
       "name": "AvoidObstacle",
       "status": "FAILED",
       "attempts": 3,
       "duration": 6.0,
-      "started_at": 1792244070.5497258,
-      "ended_at": 1792244076.553374
+      "started_at": 1792246860.02,
+      "ended_at": 1792246866.02
     },
     {
       "name": "Place",

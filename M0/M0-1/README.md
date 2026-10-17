@@ -153,10 +153,12 @@ $ stat -c "%a %n" ~/.ssh ~/.ssh/authorized_keys
 
 ## 环境验收
 
-使用题目提供的 `check_env.sh` 自查：**PASS=25 / FAIL=0 / WARN=2**
+使用题目提供的 `check_env.sh` 自查：**PASS=31 / FAIL=0 / WARN=1**（在 `~/smartcar` 目录下、交互式终端中运行）
 
-- 剩余 WARN 1：known_hosts 为空——需要实际 SSH 登录一次远程机器后消除（计划与队友互登完成）
-- 剩余 WARN 2：运行脚本时未激活虚拟环境——已验证 `uv venv && source .venv/bin/activate` 可正常创建并激活，做题时使用
+- 已消除的 WARN：`known_hosts` 为空 —— 完成 ssh / scp / rsync 三条链路实测后，该文件已有 4 条记录，此项转为 PASS（见上方「远端登录验证实录」）
+- 剩余 WARN 1：运行脚本时未激活虚拟环境 —— 激活后即消除（`source .venv/bin/activate`，激活后脚本打印 `[PASS] 当前处于虚拟环境: ...`）
+
+> 坑：`uv` 装在 `~/.local/bin/uv`，只有**登录/交互式 shell** 才会把它加进 `PATH`。用 `bash -c` 这类非交互方式运行 `check_env.sh` 会因找不到 `uv` 而误报一条 FAIL（实测非交互跑为 PASS=30/FAIL=1）。现场在终端里直接运行不会出现。
 
 ## 参考资料
 
