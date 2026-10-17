@@ -18,9 +18,21 @@ import time
 with open("tasks_demo.yaml", "r", encoding="utf-8") as f:
     data = yaml.safe_load(f)
 
-status = {}                                    # 记每个任务的最终结果
-while len(status) < len(data["tasks"]):
+start = time.time()            # 掐表：记下开始的那一刻
+timeout = data["timeout"]      # 从清单读超时上限
+
+status = {}                                     # 记每个任务的最终结果
+stopped = False                                 # 开关：是否已被迫收工
+while len(status) < len(data["tasks"]) and not stopped:
     for task in data["tasks"]:
+        if time.time() - start > timeout:       # 每个任务处理前，都看一次表
+            for t in data["tasks"]:             # 还没出结果的，全部标 TIMEOUT
+                if t["name"] not in status:
+                    status[t["name"]] = "TIMEOUT"
+                    print(f"超时：{t['name']} 未执行")
+            stopped = True                      # 拨开关，让 while 也停下来
+            break                               # 跳出 for
+
         name = task["name"]
         if name in status:                     # 已经有结果了，跳过
             continue
