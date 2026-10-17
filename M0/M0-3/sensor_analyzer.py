@@ -29,7 +29,7 @@ print("=== 传感器数据分析 ===")
 # --- 读取数据 ---
 def load_data(input_path):          # ← 改名 + 吃参数
     rows = []                       # ← 函数内部建列表
-    with open(input_path, "r", encoding="utf-8") as f:
+    with open(input_path, "r", encoding="utf-8-sig") as f:   # utf-8-sig：兼容 Excel 导出的带 BOM 文件
         reader = csv.DictReader(f)
         for row in reader:
             t = float(row["time"])

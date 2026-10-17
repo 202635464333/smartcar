@@ -28,7 +28,7 @@ if args.seed is not None:                   # 填了种子，随机结果就可�
 
 # ---------- 读配置：文件不存在、格式写错，都给中文提示，而不是甩一堆 traceback ----------
 try:
-    with open(args.config, "r", encoding="utf-8") as f:
+    with open(args.config, "r", encoding="utf-8-sig") as f:
         data = yaml.safe_load(f)
 except FileNotFoundError:
     print(f"{RED}[ERROR]{RESET} 找不到配置文件：{args.config}")
@@ -158,14 +158,14 @@ while len(status) < len(data["tasks"]) and not stopped:
             status[name] = "TIMEOUT"
             records.append({"name": name, "status": "TIMEOUT", "attempts": n,
                             "duration": round(ended - task_start, 2),
-                            "started_at": task_start, "ended_at": ended})
+                            "started_at": round(task_start, 2), "ended_at": round(ended, 2)})
             stopped = True
             finish_timeout()                    # 剩下的任务也全部终止
         else:
             status[name] = "SUCCESS" if ok else "FAILED"
             records.append({"name": name, "status": status[name], "attempts": n,
                             "duration": round(ended - task_start, 2),
-                            "started_at": task_start, "ended_at": ended})
+                            "started_at": round(task_start, 2), "ended_at": round(ended, 2)})
 
     # 一整轮扫完，一个任务都没出结果 → 说明卡住了（依赖成环）
     if len(status) == before and not stopped:
