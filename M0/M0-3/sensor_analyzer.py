@@ -29,7 +29,7 @@ print("=== 传感器数据分析 ===")
 # --- 读取数据 ---
 def load_data(input_path):          # ← 改名 + 吃参数
     rows = []                       # ← 函数内部建列表
-    with open(input_path, "r") as f:
+    with open(input_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             t = float(row["time"])
@@ -64,8 +64,7 @@ def remove_outliers(rows, mean, std):
 
 # --- 输出清洗后的数据 ---
 def save_cleaned_data(cleaned, output_path):
-    output_path = OUTPUT_FILE  
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["time", "value"])
         for row in cleaned:

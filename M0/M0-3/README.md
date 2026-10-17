@@ -17,7 +17,7 @@ python3 sensor_analyzer.py --input sensor_data.csv --output cleaned_data.csv
 ```
 
 - 输出到 stdout 的摘要包含 `均值 mean = <数值>` 与 `标准差 std = <数值>` 两行
-- `cleaned_data.csv` 写入**当前工作目录**（不写死绝对路径），内容为清洗后的 `time,value` 两列
+- 默认写入**当前工作目录**的 `cleaned_data.csv`；用 `--output 名字.csv` 可以指定别的文件名或路径（不写死绝对路径），内容为清洗后的 `time,value` 两列
 - 正常结束退出码 `0`；异常输入打印中文提示并以退出码 `1` 结束，**不抛栈回溯**
 
 ---
