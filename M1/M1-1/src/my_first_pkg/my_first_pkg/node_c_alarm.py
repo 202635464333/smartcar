@@ -12,6 +12,8 @@ class AlarmNode(Node):
 
         self.declare_parameter('alarm_threshold', 0.3)
         self.declare_parameter('service_timeout', 1.0)
+        self.declare_parameter('cooldown', 2.0)
+        self.last_alarm_time = None
 
         self.sub = self.create_subscription(
             Float32, 'processed_distance', self.on_distance, 10)
@@ -36,6 +38,13 @@ class AlarmNode(Node):
         if self.future is not None:      # 上一次还没结束，跳过
             return
 
+        # 冷却：距上次报警不足 cooldown 秒就跳过
+        cooldown = self.get_parameter('cooldown').value
+        if self.last_alarm_time is not None:
+            gap = (self.get_clock().now() - self.last_alarm_time).nanoseconds / 1e9
+            if gap < cooldown:
+                return
+
         self.fired += 1
         self.get_logger().warn(
             f'距离过近 {msg.data:.3f} < {threshold}，调用报警服务（第 {self.fired} 次）')
@@ -44,6 +53,7 @@ class AlarmNode(Node):
         req.message = f'距离 {msg.data:.2f} 米'
         self.future = self.client.call_async(req)    # 不阻塞
         self.send_time = self.get_clock().now()
+        self.last_alarm_time = self.get_clock().now()
 
     def check_timeout(self):
         if self.future is None:
