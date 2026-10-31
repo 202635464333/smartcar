@@ -12,6 +12,7 @@ find_package(builtin_interfaces REQUIRED)
 # 把 msg/SensorData.msg 编译成能 import 的消息类型
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/SensorData.msg"
+  "srv/TriggerAlarm.srv"
   DEPENDENCIES builtin_interfaces
 )
 

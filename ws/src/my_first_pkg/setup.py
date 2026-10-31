@@ -21,6 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'talker = my_first_pkg.talker:main',
+            'param_demo = my_first_pkg.param_demo:main',
+            'alarm_server = my_first_pkg.alarm_server:main',
             'listener = my_first_pkg.listener:main',
         ],
     },
