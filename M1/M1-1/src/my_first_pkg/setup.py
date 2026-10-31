@@ -20,9 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'param_demo = my_first_pkg.param_demo:main',
             'alarm_server = my_first_pkg.alarm_server:main',
-            'alarm_client = my_first_pkg.alarm_client:main',
             'node_c_alarm = my_first_pkg.node_c_alarm:main',
             'node_b_filter = my_first_pkg.node_b_filter:main',
             'node_a_sensor = my_first_pkg.node_a_sensor:main',
