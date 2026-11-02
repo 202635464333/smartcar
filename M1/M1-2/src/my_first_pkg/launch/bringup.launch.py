@@ -12,6 +12,12 @@ def generate_launch_description():
         default_value='robot1',
         description='所有节点的命名空间',
         ),
+        DeclareLaunchArgument(
+        'params_file',
+        default_value='/home/lenovo/study/M1/M1-2/params_robot1.yaml',
+        description='YAML 参数文件路径',
+        ),
+
 
         Node(
             package='my_first_pkg',
@@ -25,6 +31,7 @@ def generate_launch_description():
             executable='node_b_filter',
             name='node_b_filter',
             namespace=LaunchConfiguration('namespace'),
+            parameters=[LaunchConfiguration('params_file')],
             output='screen',
         ),
         Node(
@@ -32,6 +39,7 @@ def generate_launch_description():
             executable='node_c_alarm',
             name='node_c_alarm',
             namespace=LaunchConfiguration('namespace'),
+            parameters=[LaunchConfiguration('params_file')],
             output='screen',
         ),
     ])
