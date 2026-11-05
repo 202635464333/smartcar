@@ -1,61 +1,58 @@
-"""报警服务端：有人来调 trigger_alarm，就喊一句并回一个"已处理"。
+"""报警服务端：有人调 trigger_alarm，就喊一句并返回"已处理"。
 
-服务的特点：一问一答。跟话题不同——
-    话题：我喊出去就不管了，有没有人听、听没听懂，都不知道
-    服务：我问一句，必须有人回一句，我还能拿到回复内容
+服务 vs 话题：
+    话题：一方不停发，一方不停收，发的人不知道有没有人收到
+    服务：我问一句，必须有人答一句，我还能拿到答案
 
-本文件分三段：
+三段结构：
     第1段  import + 定义类
-    第2段  __init__ + on_request（核心只有 2 行）
+    第2段  __init__ + on_request（真正干活的只有 5 行）
     第3段  main
 """
 
-# ============ 第 1 段 ============
+# ==================== 第 1 段 ====================
 
-import rclpy
-from rclpy.node import Node
-from sensor_interfaces.srv import TriggerAlarm
+import rclpy                                        # ROS2 客户端库
+from rclpy.node import Node                         # 节点父类
+from sensor_interfaces.srv import TriggerAlarm      # 自定义服务类型
 
 
 class AlarmServer(Node):
 
-    # ============ 第 2 段 ============
+    # ==================== 第 2 段 ====================
 
     def __init__(self):
-        super().__init__('alarm_server')
+        super().__init__('alarm_server')            # 登记节点名，ros2 node list 显示 /alarm_server
 
-        # 建服务：名字 trigger_alarm，类型 TriggerAlarm。
-        # 有人来请求时，ROS 会调用 self.on_request，并把它填好的 response 送回去。
-        self.srv = self.create_service(TriggerAlarm, 'trigger_alarm', self.on_request)
+        self.srv = self.create_service(             # 建服务（开通一条电话线）
+            TriggerAlarm,                           # 服务类型
+            'trigger_alarm',                        # 服务名（电话号码）
+            self.on_request)                        # 有人打来就调这个函数
 
         self.get_logger().info('报警服务已启动，等待调用...')
 
-    def on_request(self, request, response):
-        """request 是对方发来的内容，response 是我们要回给对方的内容。"""
-
-        # request.message 就是节点C 填的那句"距离 0.20 米"
+    def on_request(self, request, response):        # 有人调用服务时自动执行
+                                                    # request = 对方发来的内容；response = 要回给对方的内容
         self.get_logger().warn(f'[ALARM] 距离过近！对方说：{request.message}')
+                                                    # request.message 就是节点C 填的那句话
 
-        # 往回复里填内容
-        response.success = True
-        response.response = '报警已处理'
+        response.success = True                     # 填回复：成功
+        response.response = '报警已处理'             # 填回复：一句话
 
-        # ★ 必须 return response，对方才能收到回复。
-        #   不 return 的话，调用方会一直等，最后超时。
-        return response
+        return response                             # ★ 必须 return，对方才收得到；不 return 调用方会超时
 
-    # ============ 第 3 段：标准启动流程 ============
+    # ==================== 第 3 段：标准启动流程 ====================
 
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = AlarmServer()
+    rclpy.init(args=args)                           # ① 启动 ROS
+    node = AlarmServer()                            # ② 造节点（执行 __init__，开通电话线）
 
-    try:
-        rclpy.spin(node)          # 卡在这里等服务请求
-    except KeyboardInterrupt:
+    try:                                            # ③ 捕获 Ctrl+C
+        rclpy.spin(node)                            # 卡在这里等服务请求
+    except KeyboardInterrupt:                       # ④ 用户按 Ctrl+C
         pass
-    finally:
+    finally:                                        # ⑤ 收尾
         node.destroy_node()
         rclpy.shutdown()
 
