@@ -1,9 +1,17 @@
-/**/node_b_filter:
-  ros__parameters:
-    alpha: 0.3
+# robot1 这一组的参数文件（报警阈值 0.3 米，比较敏感）
+#
+# 格式说明：
+#   /**/node_b_filter    ← 前面的 ** 是通配符，代表"任意命名空间"
+#                          写 /**/ 才能让 /robot1/node_b_filter 和 /robot2/node_b_filter 都匹配到
+#                          如果写成 node_b_filter: （不带 /**/），加了命名空间后就找不到，参数不生效
+#   ros__parameters      ← ROS2 规定的固定格式，下面缩进 4 格写参数名和值
 
-/**/node_c_alarm:
+/**/node_b_filter:              # 节点B 的参数
   ros__parameters:
-    alarm_threshold: 0.3
-    service_timeout: 1.0
-    cooldown: 2.0
+    alpha: 0.3                  # 滤波系数：越小越平滑、反应越慢
+
+/**/node_c_alarm:               # 节点C 的参数
+  ros__parameters:
+    alarm_threshold: 0.3        # 报警阈值：低于 0.3 米就报警（robot1 更敏感）
+    service_timeout: 1.0        # 服务超时：等 1.0 秒没回应就放弃
+    cooldown: 2.0               # 冷却：两次报警至少隔 2 秒

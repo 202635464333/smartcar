@@ -1,9 +1,18 @@
-/**/node_b_filter:
-  ros__parameters:
-    alpha: 0.3
+# robot2 这一组的参数文件（报警阈值 0.5 米，比 robot1 迟钝）
+#
+# 和 params_robot1.yaml 的唯一区别：alarm_threshold 是 0.5 而不是 0.3
+# 同一份代码、同一个 launch，靠"传给谁哪个文件"来产生不同行为
+#
+# 格式说明：
+#   /**/node_c_alarm      ← ** 通配任意命名空间，必须写，否则匹配不到 /robot2/node_c_alarm
+#   ros__parameters       ← ROS2 固定格式，下面缩进 4 格写参数
 
-/**/node_c_alarm:
+/**/node_b_filter:              # 节点B 的参数
   ros__parameters:
-    alarm_threshold: 0.5
-    service_timeout: 1.0
-    cooldown: 2.0
+    alpha: 0.3                  # 滤波系数（两组一样）
+
+/**/node_c_alarm:               # 节点C 的参数
+  ros__parameters:
+    alarm_threshold: 0.5        # ★ 报警阈值：低于 0.5 米才报警（robot2 更迟钝，不会因为小波动就报）
+    service_timeout: 1.0        # 服务超时 1 秒
+    cooldown: 2.0               # 冷却 2 秒

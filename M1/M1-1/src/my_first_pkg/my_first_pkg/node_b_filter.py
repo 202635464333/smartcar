@@ -65,6 +65,7 @@ class FilterNode(Node):
             self.y = alpha * msg.distance + (1 - alpha) * self.y
                                                     # 一阶低通：y = α·x + (1-α)·y_prev
                                                     # α 小（0.1）→ 平滑但滞后；α 大（0.9）→ 跟随快但跳动大
+                                                    #因为所测得的数据有误差导致接收结果参差不齐，将结果低通就可以让结果平滑一些，避免误报。
 
         self.pub.publish(Float32(data=float(self.y)))
                                                     # 装进 Float32 信封发出去；float() 保证是标准 Python 小数，避免 numpy 类型报错

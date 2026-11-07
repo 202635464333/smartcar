@@ -32,7 +32,7 @@ class SensorNode(Node):                             # 继承 Node，就有了 cr
             'sensor_data',                          # 话题名用相对名（无斜杠）
                                                     # ★ 相对名才能被命名空间隔离成 /robot1/sensor_data
                                                     #   写成 '/sensor_data' 会绕过命名空间，M1-2 两组会串数据
-            10)                                     # 队列深度 10
+            10)                                     # 队列深度 10（发布者与订阅者之间信息缓冲的容量）
 
         self.create_timer(0.1, self.tick)           # 定时器：每 0.1 秒调用一次 tick（0.1s = 10Hz）
                                                     # ★ 这里只是"登记"，真正开始叫是 spin 之后
@@ -48,7 +48,7 @@ class SensorNode(Node):                             # 继承 Node，就有了 cr
 
         msg.stamp = self.get_clock().now().to_msg()
                                                     # 填时间戳；用 ROS 时钟而非 time.time()
-                                                    # ★ 回放 bag 时 ROS 时钟可变成仿真时间，与真实时间不同
+                                                    # ★ 回放 bag 时 ROS 时钟可变成仿真时间(与小车时间同步)，与真实时间不同
 
         msg.unit = 'm'                              # 单位，题目要求固定 "m"
 

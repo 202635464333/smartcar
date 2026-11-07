@@ -48,7 +48,7 @@ class AlarmNode(Node):                              # 继承 Node
         self.fired = 0                               # 报警次数，只为日志可读
 
         self.create_timer(0.1, self.check_timeout)  # ★ 单独一个定时器，每 0.1 秒查一次"回话了吗"
-                                                    # 为什么不在 on_distance 里等？那会阻塞回调线程，节点卡死
+                                                    # 为什么不在 on_distance 里等（即等到回话才继续任务）？那会阻塞回调线程，节点卡死
 
         self.get_logger().info('节点C 启动：监听 processed_distance')
 
