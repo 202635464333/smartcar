@@ -61,7 +61,7 @@ class AlarmNode(Node):                              # 继承 Node
         if msg.data >= threshold:                   # 闸门①：距离够远
             return                                  # 直接结束，不管
 
-        if self.future is not None:                 # 闸门②：上一次请求还没回来
+        if self.future is not None:                 # 闸门②：上一次请求还没回来（不可重复处理同一个报警）
             return                                  # 不叠加，否则 10Hz 会打出 10 次/秒
 
         cooldown = self.get_parameter('cooldown').value      # 读冷却时间

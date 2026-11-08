@@ -119,7 +119,7 @@ def _launch_setup(context):
     namespace = LaunchConfiguration('namespace').perform(context)      # 读命名空间名（只起一组时用）
     params_file = LaunchConfiguration('params_file').perform(context)  # 读指定的 yaml 路径（可能为空字符串）
 
-    if dual:                                                    # 如果 dual 是 true（默认就是）
+    if dual:                                                    # 如果 dual （同时启用两辆车）是 true（默认就是）
         groups = {                                              # 字典里放 2 个 → 待会循环 2 次 → 起 2 组
             'robot1': params_file or DEFAULT_PARAMS['robot1'],   # 用户指定了就用指定的，没指定用默认的
             'robot2': DEFAULT_PARAMS['robot2'],                  # robot2 固定用自己那份（0.5）
@@ -147,6 +147,7 @@ def _launch_setup(context):
         # ↑ 追加一项：打一行"这一组用哪个文件"
 
         actions.append(_build_group(ns, groups[ns], use_sim_time))
+        #   执行任务
         # ↑ 追加一项：用第 2 段的函数造出这一组节点
         #   groups[ns] 是"按名字取值"——拿到这个命名空间对应的 yaml 路径
 
@@ -160,7 +161,7 @@ def generate_launch_description():
     return LaunchDescription([
 
         DeclareLaunchArgument(                                  # 声明参数 dual
-            'dual', default_value='true',                       # 默认 true → 不加参数就是起两组
+            'dual', default_value='true',                       # 默认 true → 不加参数就是默认起两组
             description='true：同时启动 robot1 与 robot2；false：只启动一组'),
 
         DeclareLaunchArgument(                                  # 声明参数 namespace
@@ -168,7 +169,7 @@ def generate_launch_description():
             description='dual=false 时使用的命名空间'),
 
         DeclareLaunchArgument(                                  # 声明参数 params_file
-            'params_file', default_value='',                    # 默认空字符串 → 表示"用内置默认文件"
+            'params_file', default_value='',                    # 默认空字符串（没给数据） → 表示"用内置默认文件"
             description='YAML 参数文件路径，留空则使用默认文件'),
 
         DeclareLaunchArgument(                                  # 声明参数 use_sim_time
@@ -176,5 +177,5 @@ def generate_launch_description():
             description='是否使用仿真时间'),
 
         OpaqueFunction(function=_launch_setup),                 # ★ 把第 3 段那个函数交给 launch
-                                                                #   它会在启动那一刻执行，返回真正的清单
+                                                                #   它会在启动那一刻执行，返回真正的清单（防止参数没读完就开始跑代码引发报错）
     ])
