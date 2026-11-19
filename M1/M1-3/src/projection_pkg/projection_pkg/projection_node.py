@@ -3,7 +3,7 @@
 四件事（对应题目四个要求）：
     1. 建 TF 树：map → odom → base_link → laser_link / camera_link（数值从 extrinsics.yaml 读，绝不写死）
     2. 时间同步：雷达 10Hz、相机 27Hz 时间戳不同源，用 ApproximateTimeSynchronizer 配最近的一对
-    3. 投影：激光点 → 相机坐标系 → 光学坐标系 → 像素坐标，按距离上色（近红远蓝）
+    3. 投影：激光点 → 相机坐标系 → 光学坐标系 → 像素坐标，按距离上色             （近红远蓝）
     4. use_sim_time 由参数控制（回放 bag 时必须 true）
 
 数据流：
@@ -50,13 +50,13 @@ class ProjectionNode(Node):                                     # 继承 Node
         # ---------- 声明参数（都可在命令行用 -p 名:=值 覆盖）----------
         self.declare_parameter('extrinsics_file', 'extrinsics.yaml')  # 外参/内参真值文件
         self.declare_parameter('output_dir', '.')                     # 效果图输出目录
-        self.declare_parameter('max_images', 3)                       # 最多存几张
+        self.declare_parameter('max_images', 3)                       # 最多存几张（配对完成的）
         self.declare_parameter('slop', 0.05)                          # 近似同步允许的最大时间差（秒）
         self.declare_parameter('queue_size', 50)                      # 同步队列深度
         self.declare_parameter('log_every', 10)                       # 每配几对报一次数（做 slop 实验时设 1）
 
         # ---------- 把参数读出来 ----------
-        extr_file = self.get_parameter('extrinsics_file').value       # yaml 路径
+        extr_file = self.get_parameter('extrinsics_file').value       # yaml 路径（相机内参fx,fy,cx,cy+雷达相机外参（旋转平移））
         self.output_dir = self.get_parameter('output_dir').value      # 存图目录
         self.max_images = int(self.get_parameter('max_images').value) # 最多存几张
         slop = float(self.get_parameter('slop').value)                # 时间差上限（秒）
@@ -68,21 +68,21 @@ class ProjectionNode(Node):                                     # 继承 Node
         self.fx = self.extr['camera_intrinsics']['fx']                # 焦距 x
         self.fy = self.extr['camera_intrinsics']['fy']                # 焦距 y
         self.cx = self.extr['camera_intrinsics']['cx']                # 图像中心 x（640/2）
-        self.cy = self.extr['camera_intrinsics']['cy']                # 图像中心 y（480/2）
+        self.cy = self.extr['camera_intrinsics']['cy']                # 图像中心 y（480/2）中心点是（320,240）
                                                                       # ★ 四个数都不写死，现场换内参也能对
 
         # ---------- TF：发静态变换 + 建查询缓存 ----------
-        self.tf_static = StaticTransformBroadcaster(self)             # 静态 TF 广播器（发一次，永久有效）
+        self.tf_static = StaticTransformBroadcaster(self)             # 静态 TF 广播器（发一次，永久有效）（即雷达与摄像头在车上坐标不同，需同步差值）
         self.publish_static_tf()                                      # 立刻发出 4 条
 
-        self.tf_buffer = Buffer()                                     # 存收到的 TF，供查询
+        self.tf_buffer = Buffer()                                     # 存收到的 TF，供查询坐标系之间的变换过程（通过时间戳）
         self.tf_listener = TransformListener(self.tf_buffer, self)    # 开始收听 /tf 和 /tf_static
 
         # ---------- 时间同步 ----------
-        self.sub_scan = Subscriber(                                   # 雷达订阅（用 message_filters 的 Subscriber）
+        self.sub_scan = Subscriber(                                   # 1.雷达订阅（用 message_filters 的 Subscriber）
             self, LaserScan, '/scan',                                 # 节点、类型、话题
-            qos_profile=qos_profile_sensor_data)                      # 传感器 QoS
-        self.sub_img = Subscriber(                                    # 图像订阅
+            qos_profile=qos_profile_sensor_data)                      # 传感器 QoS（可丢帧但不能卡）
+        self.sub_img = Subscriber(                                    # 2.图像订阅
             self, Image, '/camera/image_raw',
             qos_profile=qos_profile_sensor_data)
 
@@ -96,12 +96,12 @@ class ProjectionNode(Node):                                     # 继承 Node
         # ---------- 发布 + 存图 ----------
         self.pub = self.create_publisher(Image, '/projection/debug_image', 10)
                                                                       # 输出话题：带投影的图
-        self.bridge = CvBridge()                                      # 消息 ↔ OpenCV 的转换器
+        self.bridge = CvBridge()                                      # 消息 ↔ OpenCV 的转换器（ros2图片格式与opencv格式不同，要转换）
         self.saved = 0                                                # 已存几张图
         self.pairs = 0                                                # 已配上的帧数（给 slop 实验用）
         self.diffs = []                                               # 每一对的时间差，用来算中位数
 
-        os.makedirs(self.output_dir, exist_ok=True)                   # 建输出目录（已存在也不报错）
+        os.makedirs(self.output_dir, exist_ok=True)                   # 建输出目录（已存在也不报错exist_ok=True）
         self.get_logger().info(
             f'投影节点启动：fx={self.fx} fy={self.fy} cx={self.cx} cy={self.cy}，slop={slop*1000:.0f}ms')
 
@@ -144,10 +144,10 @@ class ProjectionNode(Node):                                     # 继承 Node
         cam = self.extr['camera_link']                                # 相机那份配置
 
         zero = (0.0, 0.0, 0.0)                                        # 单位变换用的零值
-        transforms = [
+        transforms = [                                                #odom里程计坐标系
             self.make_tf('map', 'odom', zero),                        # 题目要求有这一层，未给数值 → 单位变换
             self.make_tf('odom', 'base_link', zero),                   # 同上
-            self.make_tf(laser['parent'], 'laser_link', laser['xyz']),  # base_link → laser_link，用 yaml 里的 xyz
+            self.make_tf(laser['parent'], 'laser_link', laser['xyz']),  # laser['parent']（base_link） → laser_link，用 yaml 里的 xyz
             self.make_tf(cam['parent'], 'camera_link', cam['xyz'], cam.get('rpy', zero)),
                                                                       # base_link → camera_link，xyz + rpy
         ]
@@ -165,23 +165,24 @@ class ProjectionNode(Node):                                     # 继承 Node
                                                                       # 算这一对的时间差（秒）：sec + nanosec×1e-9
         self.diffs.append(dt)                                         # 记下来，最后算中位数
 
-        try:                                                          # 消息 → OpenCV 图像
-            frame = self.bridge.imgmsg_to_cv2(image, desired_encoding='bgr8')
+        try:                                                          # 消息 → OpenCV 图像（ROS的Image消息不能直接cv2画图）
+            frame = self.bridge.imgmsg_to_cv2(image, desired_encoding='bgr8')#OpenCV的默认格式brg8
         except Exception as e:                                        # 编码不对等异常
             self.get_logger().error(f'图像转换失败：{e}')
             return                                                    # 这张跳过
 
         try:                                                          # 查 TF：把点从雷达坐标系变到相机坐标系
-            tf_l2c = self.tf_buffer.lookup_transform(
+            tf_l2c = self.tf_buffer.lookup_transform(           #目的是将雷达扫到的点投影到相机上
+            #lookup_transform会自动把laser转成camera再逆运算转成camera坐标系下的点
                 'camera_link',                                        # ★ 第一个参数是"目标"坐标系
                 scan.header.frame_id,                                 # ★ 第二个是"源"坐标系（顺序写反会得到逆变换）
-                scan.header.stamp)                                    # 用数据自己的时间戳，不是 now
+                scan.header.stamp)                                    # 用数据自己的时间戳，不是 now（会导致在查时间时已经过了很久）
         except Exception as e:                                        # TF 还没到 / use_sim_time 没开
             self.get_logger().warn(f'查 TF 失败（可能还没收到）：{e}')
             return
 
-        q = tf_l2c.transform.rotation                                 # 提取旋转（四元数）
-        t = tf_l2c.transform.translation                              # 提取平移
+        q = tf_l2c.transform.rotation                                 # 提取旋转角度（四元数）
+        t = tf_l2c.transform.translation                              # 提取平移距离
         R = self.quat_to_matrix(q.x, q.y, q.z, q.w)                   # 四元数 → 3×3 矩阵
         T = np.array([t.x, t.y, t.z])                                 # 平移向量
 
@@ -225,9 +226,9 @@ class ProjectionNode(Node):                                     # 继承 Node
         r = np.sqrt(X ** 2 + Y ** 2 + Z ** 2)                         # 每个点到相机的直线距离
         r_norm = (r - r.min()) / max(r.max() - r.min(), 1e-6)         # 归一化到 0~1（分母加 1e-6 防除零）
         for ui, vi, ri in zip(u[inside], v[inside], r_norm[inside]):  # 逐点画
-            color = (int(255 * (1 - ri)), 0, int(255 * ri))           # BGR：近处 (0,0,255) 红，远处 (255,0,0) 蓝
+            color = (int(255 * ri), 0, int(255 * (1 - ri)))           # BGR：近处 (0,0,255) 红，远处 (255,0,0) 蓝
             cv2.circle(frame, (int(ui), int(vi)), 2, color, -1)       # 画半径 2 的实心圆
-
+               #cv2.circle(目标图像, (x,y)圆心像素坐标, 半径, 圆的颜色BRG, 线条粗细)
         out = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')       # 转回 ROS Image 消息
         out.header = image.header                                     # ★ 沿用输入的 header（时间戳不变）
                                                                       #   重新打时间戳会让 ros2 topic delay 假性归零

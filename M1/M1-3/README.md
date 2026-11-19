@@ -11,9 +11,9 @@ M1-3/
 ├── make_bag.py                  # 数据生成器（社团提供）
 ├── extrinsics.yaml              # 外参/内参真值（生成数据时写出，唯一真值来源）
 ├── sample_bag/                  # 生成的 rosbag（未入库，现场重新生成）
-├── projection_01.png            # 投影效果图 ×3
-├── projection_02.png
-├── projection_03.png
+├── projection_01.jpg            # 投影效果图 ×3
+├── projection_02.jpg
+├── projection_03.jpg
 └── README.md
 ```
 
@@ -45,7 +45,7 @@ ros2 run projection_pkg projection_node --ros-args \
 ros2 bag play sample_bag --clock --rate 0.5
 ```
 
-跑完后当前目录会出现 `projection_01.png` ~ `projection_03.png`。
+跑完后当前目录会出现 `projection_01.jpg` ~ `projection_03.jpg`。
 
 ## 参数
 
@@ -132,18 +132,38 @@ map → odom → base_link → laser_link
 **结果校验**：相机比激光高 0.1 米，所以激光点应该落在**地平线略下方**；
 越近的点越低（v 越大）。三张效果图都符合，颜色由中心红向外围蓝渐变。
 
-### 5. use_sim_time
+### 5. use_sim_time（实测结论，与常见说法不同）
 
-- 回放 bag 时 `ros2 bag play` 必须带 `--clock`，否则不发布 `/clock`
-- 节点必须 `use_sim_time:=true`，否则用系统真实时间，与数据时间戳对不上，
-  TF 查询会报 `LookupException`（时间戳在缓存里找不到）
+先给出**实测结果**：
 
-**对比实验结论**：
+| use_sim_time | 结果 |
+| :--: | :-- |
+| `true` | 出 3 张图，时间差 4.0 / 11.1 / 4.9 ms |
+| **`false`** | **同样出 3 张图，无任何报错** |
 
-| use_sim_time | 现象 |
-|---|---|
-| `false`（回放 bag 时） | 节点时钟停在真实时间，`/clock` 不生效；`lookup_transform` 用数据时间戳查 TF 时找不到对应时刻，报错配不上，一张图都存不出来 |
-| `true` | 节点时钟跟随 `/clock`，与数据时间戳一致，TF 查询成功，正常出图 |
+**也就是说：本实现里 `use_sim_time` 开不开，结果一样。**
+
+#### 为什么
+
+| 用到的机制 | 是否依赖节点时钟 |
+| :-- | :-- |
+| **静态 TF**（`/tf_static`） | ❌ 不依赖。tf2 对 static 变换不做时间外推检查，任意 stamp 都能查到 |
+| **`ApproximateTimeSynchronizer`** | ❌ 不依赖。它比较的是两个消息**自己的** stamp，与节点时钟无关 |
+| 节点自己打时间戳（`self.get_clock().now()`） | ✅ 依赖 |
+| **动态 TF**（如里程计 `odom → base_link`） | ✅ 依赖，时间对不上会抛 `ExtrapolationException` |
+| 定时器频率 | ✅ 仿真时间下跟随 `/clock` |
+
+本题只用了前两种，所以踩不到这个坑。
+
+#### 正确的结论
+
+> `use_sim_time` 不是"回放 bag 就必须开"，而是**取决于你用不用节点自己的时钟**。
+> 一旦引入动态 TF、或用 `now()` 给消息打时间戳，`false` 就会让时间基准差出几百万秒，
+> 表现为 `ExtrapolationException`（"请求的时刻早于缓存最早时刻"）。
+> 本题因为只用静态 TF + 消息自带时间戳，所以开不开都一样。
+
+**这一条我一开始写错了**（原稿写"false 会报 LookupException、一张图都存不出来"），
+是实测之后才纠正的。
 
 ## 接口契约
 

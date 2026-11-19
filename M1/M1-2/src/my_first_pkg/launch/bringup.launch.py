@@ -64,7 +64,7 @@ def _build_group(ns, params_file, use_sim_time):
     node_a = Node(                                              # 节点A：传感器
         package='my_first_pkg',                                 # 去哪个包找
         executable='node_a_sensor',                             # 可执行文件名（setup.py 里登记的那个）
-        name='node_a_sensor',                                   # 节点名，必须显式给，不依赖默认值
+        name='node_a_sensor',                                   # 节点名，必须显式给，不依赖默认值,目前名字相同的原因是能让别人一眼看出来这指的是哪个原先的代码
         parameters=common_params,                               # 用上面那份参数
         output='screen',                                        # 日志直接打到屏幕（不加这句日志会被吞掉）
     )
@@ -81,7 +81,7 @@ def _build_group(ns, params_file, use_sim_time):
         package='my_first_pkg',
         executable='node_c_alarm',
         name='node_c_alarm',
-        namespace=ns,                                           # ★ 这里必须显式写命名空间
+        namespace=PushRosNamespace(ns),                                          # ★ 这里必须显式写命名空间
                                                                 #   因为它是被"事件"启动的，不会继承下面 PushRosNamespace 的作用域
                                                                 #   不写的话会跑到根命名空间，变成 /node_c_alarm，验收时数不出 6 个
         parameters=common_params,
@@ -112,8 +112,7 @@ def _launch_setup(context):
     dual = LaunchConfiguration('dual').perform(context).lower() in ('true', '1', 'yes')
     # ↑ 读出 dual 参数的值，转小写，看是不是 true/1/yes 之一 → 得到 True 或 False
 
-    use_sim_time = (LaunchConfiguration('use_sim_time').perform(context).lower()
-                    in ('true', '1', 'yes'))
+    use_sim_time = (LaunchConfiguration('use_sim_time').perform(context).lower() in ('true', '1', 'yes'))
     # ↑ 同理，读 use_sim_time
 
     namespace = LaunchConfiguration('namespace').perform(context)      # 读命名空间名（只起一组时用）
@@ -160,7 +159,7 @@ def generate_launch_description():
     """ros2 launch 会自动调用这个函数，拿到它返回的清单去执行。"""
     return LaunchDescription([
 
-        DeclareLaunchArgument(                                  # 声明参数 dual
+        DeclareLaunchArgument(                                  # 声明动态参数 dual
             'dual', default_value='true',                       # 默认 true → 不加参数就是默认起两组
             description='true：同时启动 robot1 与 robot2；false：只启动一组'),
 
