@@ -64,20 +64,6 @@ def make_qos(depth=1):
     )
 
 
-def make_pub_qos():
-    """输出话题的 QoS。
-
-    与订阅端不同：订阅端要 BEST_EFFORT + depth=1（宁可丢帧也不排队），
-    输出端用 RELIABLE + depth=5 —— 结果图丢了可惜，而且下游(如 ros2 topic hz、
-    录制节点)通常用 RELIABLE 订阅，用 BEST_EFFORT 会让它们看到偏低的频率。
-    """
-    return QoSProfile(
-        depth=5,
-        reliability=ReliabilityPolicy.RELIABLE,
-        history=HistoryPolicy.KEEP_LAST,
-    )
-
-
 class ImageProc(Node):
     def __init__(self):
         super().__init__("image_proc")

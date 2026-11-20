@@ -59,19 +59,33 @@ class CameraSim(Node):
         self.report_timer = self.create_timer(3.0, self.report)         # 每 3 秒报一次频率
 
     def capture(self):
-        """造一帧图像。★ 向量化：跟原版逐像素循环结果完全一致，但快~100 倍。
+        """造一帧图像。
 
-        原版逻辑（等价的）：
-            off = (y*13 + seq) & 0xFF
-            value = (x + off) & 0xFF
-            RGB = (value, value, 60)
+        ★ 这是全链路最大的一处改动：从「双重 Python 循环逐像素写」改成 numpy 向量化。
+
+        原版（慢，单帧吃掉大半个帧预算）：
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            for y in range(480):                    # 480 次
+                row = frame[y]
+                off = (y * 13 + seq) & 0xFF
+                for x in range(640):                # × 640 次 = 307200 次 Python 循环
+                    value = (x + off) & 0xFF
+                    row[x, 0] = value               # 还要写三次通道
+                    row[x, 1] = value
+                    row[x, 2] = 60
+
+        现在（同一份图案，但只做 3 次 numpy 运算）：
+            off = (y*13 + seq) & 0xFF               ← 每行一个偏移，用 arange 一次算完 480 个
+            value = (x + off) & 0xFF                ← 用广播一次算完 480×640 个
+            return value                            ← 直接返回单通道灰度（原版拼了 3 通道，这里省掉）
         """
         off = (np.arange(IMAGE_HEIGHT, dtype=np.int32)[:, None] * 13 + self.seq) & 0xFF
-                                                                    # 每行的偏移，形状 (480, 1)，靠广播铺到 640 列
-        xs = np.arange(IMAGE_WIDTH, dtype=np.int32)[None, :]         # 列号，形状 (1, 640)
-        value = ((xs + off) & 0xFF).astype(np.uint8)                 # 一张 (480, 640) 的灰度值
-
-        return value                                                 # 直接返回灰度图（不再拼三通道）
+                                                                    # 形状 (480, 1)：每行的偏移量
+                                                                    # [:, None] 是加一维，为了后面广播
+        xs = np.arange(IMAGE_WIDTH, dtype=np.int32)[None, :]         # 形状 (1, 640)：列号
+        value = ((xs + off) & 0xFF).astype(np.uint8)                 # 广播相加 → (480, 640)，一次算完整张图
+                                                                    # & 0xFF 等价于原版的「超过255就减256」
+        return value                                                 # 返回单通道灰度图（mono8）
 
     def on_timer(self):
         self.seq += 1                                                # 帧号 +1
