@@ -11,9 +11,9 @@ M1-3/
 ├── make_bag.py                  # 数据生成器（社团提供）
 ├── extrinsics.yaml              # 外参/内参真值（生成数据时写出，唯一真值来源）
 ├── sample_bag/                  # 生成的 rosbag（未入库，现场重新生成）
-├── projection_01.jpg            # 投影效果图 ×3
-├── projection_02.jpg
-├── projection_03.jpg
+├── projection_01.png            # 投影效果图 ×3
+├── projection_02.png
+├── projection_03.png
 └── README.md
 ```
 
@@ -45,7 +45,7 @@ ros2 run projection_pkg projection_node --ros-args \
 ros2 bag play sample_bag --clock --rate 0.5
 ```
 
-跑完后当前目录会出现 `projection_01.jpg` ~ `projection_03.jpg`。
+跑完后当前目录会出现 `projection_01.png` ~ `projection_03.png`。
 
 ## 参数
 
@@ -164,6 +164,28 @@ map → odom → base_link → laser_link
 
 **这一条我一开始写错了**（原稿写"false 会报 LookupException、一张图都存不出来"），
 是实测之后才纠正的。
+
+
+### 6. 换外参可复现（现场验收项）
+
+验收会用**非默认外参**重新生成数据（如 `--laser-z 0.45 --camera-z 0.75 --fx 420`），
+然后直接跑本节点。**代码里没有任何写死的安装数值，全部从 yaml 读**，所以不用改代码。
+
+实测（同一份节点代码，只换 yaml）：
+
+```bash
+python3 make_bag.py --frames 20 --out /tmp/test_ext/bag     --extrinsics /tmp/test_ext/ext.yaml     --laser-z 0.45 --camera-z 0.75 --fx 420
+
+ros2 run projection_pkg projection_node --ros-args   -p use_sim_time:=true   -p extrinsics_file:=/tmp/test_ext/ext.yaml   -p output_dir:=/tmp/test_ext/out
+```
+
+| 外参 | 日志里的 fx | 投影点纵向范围 | 中位 v |
+| :-- | :--: | :--: | :--: |
+| 默认（dz=0.10） | 500.0 | 248 ~ 368 | 336 |
+| 新外参（dz=0.30） | **420.0** | 262 ~ 369 | 323 |
+
+两组的点都在画面中心（v=240）**下方**，符合"相机高于激光平面"的预期；
+`fx` 也随 yaml 变成 420，**证明内参没有写死**。
 
 ## 接口契约
 
