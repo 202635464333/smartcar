@@ -32,6 +32,7 @@ from message_filters import (                                   # 时间同步�
     ApproximateTimeSynchronizer,                                # 近似同步：允许两个时间戳差一点点
     Subscriber,                                                 # 可喂给同步器的订阅者（注意不是 create_subscription）
 )
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node                                     # 节点父类
 from rclpy.qos import qos_profile_sensor_data                    # 传感器常用 QoS（best_effort，深度 5）
 from sensor_msgs.msg import Image, LaserScan                    # 两个输入消息类型
@@ -263,13 +264,18 @@ def main(args=None):
     rclpy.init(args=args)                                             # ① 启动 ROS
     node = ProjectionNode()                                           # ② 造节点（执行 __init__）
 
-    try:                                                              # ③ 捕获 Ctrl+C
+    try:                                                              # ③ 捕获两种退出方式
         rclpy.spin(node)                                              # 卡在事件循环里等同步好的数据
-    except KeyboardInterrupt:                                         # ④ 用户按 Ctrl+C
+    except (KeyboardInterrupt, ExternalShutdownException):
+        # KeyboardInterrupt   = 用户按 Ctrl+C
+        # ExternalShutdownException = 被 SIGTERM 结束（如 timeout、kill、launch 关闭）
+        # ★ 只捕获前者的话，被 timeout 结束时异常会漏出去，finally 里再 shutdown 就报
+        #   RCLError: failed to shutdown: rcl_shutdown already called
         pass
-    finally:                                                          # ⑤ 收尾
+    finally:                                                          # ④ 收尾
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():                                                # ★ 只有 ROS 还活着才关闭
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
