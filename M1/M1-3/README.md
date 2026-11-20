@@ -155,6 +155,19 @@ map → odom → base_link → laser_link
 
 本题只用了前两种，所以踩不到这个坑。
 
+
+#### 对比图（实拍）
+
+```
+M1/M1-3/sim_time_compare/
+├── sim_true/projection_01.png    ← use_sim_time:=true 跑出来的
+├── sim_true/projection_02.png
+├── sim_false/projection_01.png   ← use_sim_time:=false 跑出来的
+└── sim_false/projection_02.png
+```
+
+**两组图张数相同、内容相同**，这就是"开关无差异"的直接证据。
+
 #### 正确的结论
 
 > `use_sim_time` 不是"回放 bag 就必须开"，而是**取决于你用不用节点自己的时钟**。
