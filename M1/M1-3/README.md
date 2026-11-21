@@ -207,7 +207,7 @@ ros2 run projection_pkg projection_node --ros-args   -p use_sim_time:=true   -p 
 | `/scan` | `sensor_msgs/LaserScan` | 输入（bag） |
 | `/camera/image_raw` | `sensor_msgs/Image` | 输入（bag） |
 | `/camera/camera_info` | `sensor_msgs/CameraInfo` | 输入（bag，本节点未直接使用，内参从 yaml 读） |
-| `/projection/debug_image` | `sensor_msgs/Image`（`bgr8`） | **输出** |
+| `/projection/debug_image` | `sensor_msgs/Image`（`rgb8`） | **输出**（按题目接口契约，`rgb8`） |
 | `/tf_static` | `tf2_msgs/TFMessage` | 静态 TF |
 
 坐标系：`map` / `odom` / `base_link` / `laser_link` / `camera_link`

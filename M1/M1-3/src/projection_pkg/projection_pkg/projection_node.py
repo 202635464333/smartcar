@@ -230,7 +230,10 @@ class ProjectionNode(Node):                                     # 继承 Node
             color = (int(255 * ri), 0, int(255 * (1 - ri)))           # BGR：近处 (0,0,255) 红，远处 (255,0,0) 蓝
             cv2.circle(frame, (int(ui), int(vi)), 2, color, -1)       # 画半径 2 的实心圆
                #cv2.circle(目标图像, (x,y)圆心像素坐标, 半径, 圆的颜色BRG, 线条粗细)
-        out = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')       # 转回 ROS Image 消息
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)                  # ★ frame 内部是 BGR（OpenCV 默认），
+                                                                      #   而题目接口契约要求输出 rgb8 → 发布前翻一次通道
+                                                                      #   漏这一步，下游按 rgb8 读会红蓝互换（近处变蓝）
+        out = self.bridge.cv2_to_imgmsg(rgb, encoding='rgb8')         # 转回 ROS Image 消息（★ rgb8，不是 bgr8）
         out.header = image.header                                     # ★ 沿用输入的 header（时间戳不变）
                                                                       #   重新打时间戳会让 ros2 topic delay 假性归零
         self.pub.publish(out)                                         # 发出去
@@ -239,7 +242,7 @@ class ProjectionNode(Node):                                     # 继承 Node
             self.saved += 1                                           # 计数 +1
             path = os.path.join(self.output_dir, f'projection_{self.saved:02d}.png')
                                                                       # 拼路径：projection_01.png
-            cv2.imwrite(path, frame)                                  # 存图
+            cv2.imwrite(path, frame)                                  # 存图（★ 必须用 BGR 的 frame，别跟着换成 rgb）
             self.get_logger().info(f'已保存 {path}（第 {self.pairs} 对，时间差 {dt*1000:.1f}ms）')
 
         if self.pairs % self.log_every == 0:                          # 每 N 对报一次统计
